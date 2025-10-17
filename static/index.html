@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Knowledge Base Search Engine</title>
+<style>
+body{font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;line-height:1.6;color:#333;max-width:1200px;margin:0 auto;padding:20px;background-color:#f5f7fa}
+h1{color:#2c3e50;text-align:center;margin-bottom:30px}
+.container{display:flex;flex-direction:column;gap:30px}
+.card{background:white;border-radius:8px;box-shadow:0 4px 6px rgba(0,0,0,0.1);padding:25px;margin-bottom:20px}
+.card h2{color:#3498db;margin-top:0;border-bottom:1px solid #eee;padding-bottom:10px}
+.form-group{margin-bottom:15px}
+label{display:block;margin-bottom:5px;font-weight:600}
+input[type="text"],textarea{width:100%;padding:10px;border:1px solid #ddd;border-radius:4px;font-size:16px}
+textarea{min-height:100px;resize:vertical}
+button{background-color:#3498db;color:white;border:none;padding:12px 20px;border-radius:4px;cursor:pointer;font-size:16px;transition:background-color 0.3s}
+button:hover{background-color:#2980b9}
+.file-input{margin-bottom:15px}
+#uploadStatus,#queryStatus{margin-top:15px;padding:10px;border-radius:4px}
+.success{background-color:#d4edda;color:#155724}
+.error{background-color:#f8d7da;color:#721c24}
+.answer-container{margin-top:20px;padding:15px;background-color:#e8f4f8;border-radius:4px;border-left:4px solid #3498db}
+.sources-container{margin-top:15px}
+.source-item{background-color:#f8f9fa;padding:10px;margin-bottom:10px;border-radius:4px;border-left:3px solid #6c757d;font-size:14px}
+.loading{text-align:center;margin:20px 0;display:none}
+.loading:after{content:" .";animation:dots 1s steps(5,end) infinite}
+@keyframes dots{0%,20%{content:" ."}40%{content:" .."}60%{content:" ..."}80%,100%{content:" ...."}}
+</style>
+</head>
+<body>
+<h1>Knowledge Base Search Engine</h1>
+<div class="container">
+<div class="card">
+<h2>Upload Documents</h2>
+<form id="uploadForm">
+<div class="form-group">
+<label for="documents">Select PDF or Text Files:</label>
+<input type="file" id="documents" name="files" multiple accept=".pdf,.txt" class="file-input">
+</div>
+<button type="submit">Upload Documents</button>
+</form>
+<div id="uploadStatus"></div>
+<div id="uploadLoading" class="loading">Processing documents</div>
+</div>
+<div class="card">
+<h2>Ask a Question</h2>
+<form id="queryForm">
+<div class="form-group">
+<label for="query">Your Question:</label>
+<textarea id="query" name="query" placeholder="Enter your question here..."></textarea>
+</div>
+<button type="submit">Get Answer</button>
+</form>
+<div id="queryLoading" class="loading">Generating answer</div>
+<div id="answerContainer" style="display: none;" class="answer-container">
+<h3>Answer:</h3>
+<div id="answer"></div>
+<div class="sources-container">
+<h4>Sources:</h4>
+<div id="sources"></div>
+</div>
+</div>
+</div>
+</div>
+<script>
+document.addEventListener('DOMContentLoaded',function(){
+const uploadForm=document.getElementById('uploadForm');
+const queryForm=document.getElementById('queryForm');
+const uploadStatus=document.getElementById('uploadStatus');
+const answerContainer=document.getElementById('answerContainer');
+const answerElement=document.getElementById('answer');
+const sourcesElement=document.getElementById('sources');
+const uploadLoading=document.getElementById('uploadLoading');
+const queryLoading=document.getElementById('queryLoading');
+uploadForm.addEventListener('submit',async function(e){
+e.preventDefault();
+const formData=new FormData();
+const fileInput=document.getElementById('documents');
+if(fileInput.files.length===0){
+uploadStatus.textContent='Please select at least one file.';
+uploadStatus.className='error';
+return;
+}
+for(let i=0;i<fileInput.files.length;i++){
+formData.append('files',fileInput.files[i]);
+}
+uploadStatus.textContent='';
+uploadStatus.className='';
+uploadLoading.style.display='block';
+try{
+const response=await fetch('/upload',{
+method:'POST',
+body:formData
+});
+const result=await response.json();
+if(response.ok){
+uploadStatus.textContent=result.message;
+uploadStatus.className='success';
+uploadForm.reset();
+}else{
+uploadStatus.textContent=result.detail||'Error uploading documents.';
+uploadStatus.className='error';
+}
+}catch(error){
+uploadStatus.textContent='Error: '+error.message;
+uploadStatus.className='error';
+}finally{
+uploadLoading.style.display='none';
+}
+});
+queryForm.addEventListener('submit',async function(e){
+e.preventDefault();
+const query=document.getElementById('query').value.trim();
+if(!query){
+return;
+}
+answerContainer.style.display='none';
+queryLoading.style.display='block';
+const formData=new FormData();
+formData.append('query',query);
+try{
+const response=await fetch('/query',{
+method:'POST',
+body:formData
+});
+const result=await response.json();
+if(response.ok){
+answerElement.textContent=result.answer;
+sourcesElement.innerHTML='';
+if(result.sources&&result.sources.length>0){
+result.sources.forEach(source=>{
+const sourceDiv=document.createElement('div');
+sourceDiv.className='source-item';
+sourceDiv.innerHTML=`<strong>Source:</strong> ${source.source}<br><strong>Excerpt:</strong> ${source.content}`;
+sourcesElement.appendChild(sourceDiv);
+});
+}else{
+sourcesElement.innerHTML='<p>No specific sources found.</p>';
+}
+answerContainer.style.display='block';
+}else{
+alert(result.detail||'Error processing your query.');
+}
+}catch(error){
+alert('Error: '+error.message);
+}finally{
+queryLoading.style.display='none';
+}
+});
+});
+</script>
+</body>
+</html>
